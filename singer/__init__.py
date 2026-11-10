@@ -59,6 +59,14 @@ from singer.catalog import (
     Catalog,
     CatalogEntry
 )
+from singer.catalog_migration import (
+    CatalogMigrationError,
+    CatalogMigrationInputChanged,
+    MigrationPlan,
+    RenameMappingError,
+    apply_migration,
+    plan_migration,
+)
 from singer.schema import Schema
 
 from singer.state import (
