@@ -36,6 +36,56 @@ singer.write_records('my_table',
 singer.write_state({'my_table': 'd'})
 ```
 
+Flattening array-of-object fields
+---------------------------------
+
+Some targets only accept flat tables. `singer.array_flattener` is a message
+transformer that sits between a tap and a target and expands configured
+top-level array-of-object properties into child streams. The parent stream
+keeps every other field and gains one `<array>_array_status` column per
+configured array whose value is one of `missing`, `null`, `empty` or
+`present`, so the three empty-ish cases stay distinguishable.
+
+Each child record carries the typed parent key property values and an
+`_sdc_source_array_index` (its position in the original array). Arrays are
+expanded independently in configuration order, never as a cartesian product,
+and duplicate array elements are preserved. Child `SCHEMA` messages,
+`key_properties` (`<parent keys> + _sdc_source_array_index`) and selection
+metadata are generated automatically. A `STATE` message is only forwarded
+after all messages derived from the preceding records have been written.
+
+Configuration:
+
+```json
+{
+  "streams": [
+    {
+      "stream": "users",
+      "key_properties": ["id"],
+      "arrays": [
+        {"array_path": "tags"},
+        {"array_path": "emails", "child_stream": "user_emails"}
+      ]
+    }
+  ]
+}
+```
+
+Use it as a library with an injectable writer, or as a CLI that reads Singer
+JSON lines on stdin and writes the transformed stream to stdout:
+
+```python
+from singer import ArrayFlattener
+
+flattener = ArrayFlattener(config, writer=output.append)
+for message in parsed_tap_messages:
+    flattener.handle_message(message)
+```
+
+```bash
+tap-whatever | singer-array-flatten --config flattener-config.json | target-whatever
+```
+
 
 License
 -------

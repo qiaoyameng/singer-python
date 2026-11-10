@@ -1,5 +1,8 @@
 # Changelog
 
+## 6.10.0
+  * Add `singer.array_flattener`, a configurable Singer message transformer that expands one-level array-of-object fields into child streams with typed parent keys, array indexes, explicit array status columns, generated SCHEMA messages and selection metadata
+
 ## 6.9.0
   * Suppress the `Skipping stream` log when `SINGER_SUPPRESS_SKIPPED_STREAM_LOG=true`
 

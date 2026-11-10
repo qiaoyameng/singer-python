@@ -79,11 +79,23 @@ from singer.state import (
 )
 
 from singer.exceptions import (
+    ArrayFlattenerError,
     SingerConfigurationError,
     SingerDiscoveryError,
     SingerError,
     SingerRetryableRequestError,
     SingerSyncError,
+)
+
+from singer.array_flattener import (
+    ArrayFlattener,
+    ArrayFlattenerConfigurationError,
+    ArrayFlattenerSyncError,
+    STATUS_EMPTY,
+    STATUS_MISSING,
+    STATUS_NULL,
+    STATUS_PRESENT,
+    flatten_input,
 )
 
 if __name__ == "__main__":

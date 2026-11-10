@@ -28,3 +28,15 @@ class SingerSyncError(SingerError):
 
 class SingerRetryableRequestError(SingerError):
     """This error is meant to be thrown when a tap encounters a retryable request"""
+
+
+class ArrayFlattenerError(SingerError):
+    """The base class of errors raised by the array-of-objects flattener"""
+
+
+class ArrayFlattenerConfigurationError(ArrayFlattenerError, SingerConfigurationError):
+    """Raised when flattener configuration or an input SCHEMA is invalid"""
+
+
+class ArrayFlattenerSyncError(ArrayFlattenerError, SingerSyncError):
+    """Raised when an input RECORD cannot be flattened during a sync"""

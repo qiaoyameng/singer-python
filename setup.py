@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 import subprocess
 
 setup(name="singer-python",
-      version='6.9.0',
+      version='6.10.0',
       description="Singer.io utility library",
       author="Stitch",
       classifiers=['Programming Language :: Python :: 3 :: Only'],
@@ -27,6 +27,11 @@ setup(name="singer-python",
           ]
       },
       packages=find_packages(),
+      entry_points={
+          'console_scripts': [
+              'singer-array-flatten=singer.array_flattener:main',
+          ],
+      },
       package_data = {
           'singer': [
               'logging.conf'
