@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+  * Add `observe`/`merge`/`finalize` three-phase interface to `singer.schema_generation` for sharded schema inference; `generate_schema` is unchanged
+
 ## 6.9.0
   * Suppress the `Skipping stream` log when `SINGER_SUPPRESS_SKIPPED_STREAM_LOG=true`
 
