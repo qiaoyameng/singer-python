@@ -1,5 +1,11 @@
 # Changelog
 
+## 6.10.0
+  * Migrate from jsonschema 2.x to jsonschema 4.x; `$ref` resolution in
+    `singer.transform.resolve_schema_references` now uses the `referencing`
+    library pinned to draft-4 semantics. See MIGRATION-jsonschema-4.md for
+    behavior differences and migration notes.
+
 ## 6.9.0
   * Suppress the `Skipping stream` log when `SINGER_SUPPRESS_SKIPPED_STREAM_LOG=true`
 

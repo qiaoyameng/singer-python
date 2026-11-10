@@ -4,14 +4,15 @@ from setuptools import setup, find_packages
 import subprocess
 
 setup(name="singer-python",
-      version='6.9.0',
+      version='6.10.0',
       description="Singer.io utility library",
       author="Stitch",
       classifiers=['Programming Language :: Python :: 3 :: Only'],
       url="http://singer.io",
       install_requires=[
           'pytz>=2018.4',
-          'jsonschema>=2.6.0,==2.*',
+          'jsonschema>=4.19.0,==4.*',
+          'referencing>=0.30.0,==0.*',
           'simplejson>=3.13.2,==3.*',
           'python-dateutil>=2.7.3,==2.*',
           'backoff>=2.2.1,==2.*',

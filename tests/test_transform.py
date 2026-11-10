@@ -3,6 +3,7 @@ import sys
 import unittest
 import decimal
 import simplejson as json
+from referencing.exceptions import Unresolvable
 import singer.messages as messages
 from singer import transform
 from singer.transform import *
@@ -13,6 +14,31 @@ class TestTransform(unittest.TestCase):
         self.assertEqual(123, transform(123, schema))
         self.assertEqual(123, transform('123', schema))
         self.assertEqual(1234, transform('1,234', schema))
+
+    def test_boolean_integer_transform_compat(self):
+        self.assertEqual(1, transform(True, {'type': 'integer'}))
+        self.assertEqual(0, transform(False, {'type': 'integer'}))
+        self.assertEqual(True, transform(1, {'type': 'boolean'}))
+        self.assertEqual(False, transform('false', {'type': 'boolean'}))
+
+    def test_decimal_transform_compat(self):
+        schema = {"type": "string", "format": "singer.decimal"}
+        self.assertEqual("1.5", transform(decimal.Decimal("1.5"), schema))
+
+    def test_anyof_error_reports_outer_path(self):
+        schema = {"type": "object",
+                  "properties": {"f": {"anyOf": [{"type": "integer"},
+                                                 {"type": "array",
+                                                  "items": {"type": "string"}}]}}}
+        with self.assertRaises(SchemaMismatch) as ctx:
+            transform({"f": "abc"}, schema)
+        message = str(ctx.exception)
+        self.assertIn("f: data does not match", message)
+
+        transformer = Transformer()
+        with self.assertRaises(SchemaMismatch):
+            transformer.transform({"f": "abc"}, schema)
+        self.assertEqual([["f"], []], [e.path for e in transformer.errors])
 
     def test_nested_transform(self):
         schema =  {"type": "object",
@@ -473,6 +499,39 @@ class TestResolveSchemaReferences(unittest.TestCase):
         result = resolve_schema_references(schema, refs)
         self.assertEqual(result['properties']['name']['type'], "string")
         self.assertEqual(result['properties']['name']['still_here'], "yep")
+
+    def test_recursive_reference_raises_value_error(self):
+        schema = {"type": "object",
+                  "definitions": {"node": {"type": "object",
+                                           "properties": {"child": {"$ref": "#/definitions/node"}}}},
+                  "properties": {"root": {"$ref": "#/definitions/node"}}}
+        with self.assertRaises(ValueError) as ctx:
+            resolve_schema_references(schema)
+        self.assertIn("recursive", str(ctx.exception).lower())
+
+    def test_unregistered_remote_ref_fails_without_network(self):
+        schema = {"type": "object",
+                  "properties": {"a": {"$ref": "http://example.com/schema.json#/definitions/x"}}}
+        with self.assertRaises(Unresolvable):
+            resolve_schema_references(schema)
+
+    def test_unregistered_local_ref_fails(self):
+        schema = {"type": "object",
+                  "properties": {"a": {"$ref": "missing.json#/definitions/x"}}}
+        with self.assertRaises(Unresolvable):
+            resolve_schema_references(schema)
+
+    def test_draft4_id_anchors_resolve(self):
+        # Draft-4 uses "id" (not "$id") to rebase relative references. This
+        # must keep working so upgrading jsonschema does not silently shift
+        # resolution to a newer draft's semantics.
+        schema = {"id": "root.json",
+                  "type": "object",
+                  "definitions": {"sub": {"id": "sub.json",
+                                          "definitions": {"s": {"type": "string"}}}},
+                  "properties": {"a": {"$ref": "sub.json#/definitions/s"}}}
+        result = resolve_schema_references(schema)
+        self.assertEqual(result["properties"]["a"]["type"], "string")
 
 class TestPatternProperties(unittest.TestCase):
     def test_pattern_properties_match(self):

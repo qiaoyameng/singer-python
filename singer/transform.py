@@ -2,7 +2,9 @@ import datetime
 import decimal
 import logging
 import re
-from jsonschema import RefResolver
+
+from referencing import Registry, Resource
+from referencing.jsonschema import DRAFT4
 
 import singer.metadata
 from singer.logger import get_logger
@@ -377,6 +379,12 @@ def resolve_schema_references(schema, refs=None):
 
     This modifies the input schema and also returns it.
 
+    References are resolved with draft-4 semantics against the given schema
+    and the refs store only. References that are not present locally
+    (including remote http(s) URIs) raise referencing.exceptions.Unresolvable
+    immediately; no network access is attempted. Recursive references cannot
+    be inlined and raise ValueError.
+
     Arguments:
         schema:
             the schema dict
@@ -387,28 +395,64 @@ def resolve_schema_references(schema, refs=None):
         schema
     '''
     refs = refs or {}
-    return _resolve_schema_references(schema, RefResolver("", schema, store=refs))
+    return _resolve_schema_references(schema, _Draft4RefResolver(schema, store=refs))
 
-def _resolve_schema_references(schema, resolver):
+
+class _Draft4RefResolver:
+    '''Resolves $refs against a root schema and a store of schemata.
+
+    Replaces jsonschema.RefResolver (pinned to draft-4 via
+    referencing.jsonschema.DRAFT4 so upgrading jsonschema does not shift
+    resolution to a newer draft). As with the previous
+    RefResolver("", schema, store=refs) construction, every reference is
+    resolved against the empty base URI, and only locally provided schemata
+    are consulted.
+    '''
+
+    def __init__(self, schema, store=None):
+        resources = [("", Resource.from_contents(schema, default_specification=DRAFT4))]
+        resources.extend(
+            (uri, Resource.from_contents(contents, default_specification=DRAFT4))
+            for uri, contents in (store or {}).items()
+        )
+        self._resolver = Registry().with_resources(resources).resolver(base_uri="")
+
+    def resolve(self, ref):
+        resolved = self._resolver.lookup(ref)
+        return ref, resolved.contents
+
+
+def _resolve_schema_references(schema, resolver, _ancestors=None):
+    if _ancestors is None:
+        _ancestors = set()
+
     if SchemaKey.ref in schema:
         reference_path = schema.pop(SchemaKey.ref, None)
         resolved = resolver.resolve(reference_path)[1]
         schema.update(resolved)
-        return _resolve_schema_references(schema, resolver)
+        return _resolve_schema_references(schema, resolver, _ancestors)
 
-    if SchemaKey.properties in schema:
-        for k, val in schema[SchemaKey.properties].items():
-            schema[SchemaKey.properties][k] = _resolve_schema_references(val, resolver)
+    if id(schema) in _ancestors:
+        raise ValueError(
+            "Cannot resolve recursive $ref: schema references itself "
+            "and cannot be inlined")
+    _ancestors.add(id(schema))
+    try:
+        if SchemaKey.properties in schema:
+            for k, val in schema[SchemaKey.properties].items():
+                schema[SchemaKey.properties][k] = _resolve_schema_references(val, resolver, _ancestors)
 
-    if SchemaKey.pattern_properties in schema:
-        for k, val in schema[SchemaKey.pattern_properties].items():
-            schema[SchemaKey.pattern_properties][k] = _resolve_schema_references(val, resolver)
+        if SchemaKey.pattern_properties in schema:
+            for k, val in schema[SchemaKey.pattern_properties].items():
+                schema[SchemaKey.pattern_properties][k] = _resolve_schema_references(val, resolver, _ancestors)
 
-    if SchemaKey.items in schema:
-        schema[SchemaKey.items] = _resolve_schema_references(schema[SchemaKey.items], resolver)
+        if SchemaKey.items in schema:
+            schema[SchemaKey.items] = _resolve_schema_references(schema[SchemaKey.items], resolver, _ancestors)
 
-    if SchemaKey.any_of in schema:
-        for i, element in enumerate(schema[SchemaKey.any_of]):
-            schema[SchemaKey.any_of][i] = _resolve_schema_references(element, resolver)
+        if SchemaKey.any_of in schema:
+            for i, element in enumerate(schema[SchemaKey.any_of]):
+                schema[SchemaKey.any_of][i] = _resolve_schema_references(element, resolver, _ancestors)
+    finally:
+        _ancestors.discard(id(schema))
 
     return schema
