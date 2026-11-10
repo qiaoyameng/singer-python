@@ -86,6 +86,19 @@ from singer.exceptions import (
     SingerSyncError,
 )
 
+from singer.validation import (
+    CheckpointEvent,
+    MessageStreamValidator,
+    MessageValidationError,
+    RecordAccepted,
+    SchemaAccepted,
+    ValidationErrorEvent,
+    ValidationEvent,
+    VersionActivated,
+    VersionPolicy,
+    validate_message_stream,
+)
+
 if __name__ == "__main__":
     import doctest
     doctest.testmod()
